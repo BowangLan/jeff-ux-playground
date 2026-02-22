@@ -21,6 +21,11 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
       </ThemedView>
+      <Link href="/create-new-card">
+        <Link.Trigger>
+          <ThemedText type="subtitle">Create New Card</ThemedText>
+        </Link.Trigger>
+      </Link>
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
         <ThemedText>
