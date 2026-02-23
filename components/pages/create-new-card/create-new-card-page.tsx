@@ -40,6 +40,7 @@ export default function CreateNewCardPage() {
 
   const [activeSelectedCard, setActiveSelectedCard] = useState<Card | null>(null);
   const selectionProgress = useSharedValue(0);
+  const activeIndexSV = useSharedValue(-1);
 
   const deckTopY = height - DECK_HEIGHT;
   const navHeaderHeight = insets.top + NAV_HEADER_HEIGHT;
@@ -74,11 +75,14 @@ export default function CreateNewCardPage() {
       .onEnd((e) => {
         if (selectionProgress.value > 0.5) {
           selectionProgress.value = withTiming(0, { duration: 400, easing: EASING }, (finished) => {
-            if (finished) scheduleOnRN(setActiveSelectedCard, null);
+            if (finished) {
+              activeIndexSV.value = -1;
+              scheduleOnRN(setActiveSelectedCard, null);
+            }
           });
           return;
         }
-        const DURATION = 600;
+        const DURATION = 500;
 
         const wasExpanded = gestureStartExpanded.value > 0.5;
         if (wasExpanded) {
@@ -113,7 +117,7 @@ export default function CreateNewCardPage() {
     });
 
     return Gesture.Race(pan, tap);
-  }, [expansionProgress, gestureStartExpanded, expandDeck, deckTravelDistance, selectionProgress]);
+  }, [expansionProgress, gestureStartExpanded, expandDeck, deckTravelDistance, selectionProgress, activeIndexSV]);
 
   const scrollCardsAnimatedStyle = useAnimatedStyle(() => ({
     opacity: 1 - expansionProgress.value,
@@ -141,13 +145,17 @@ export default function CreateNewCardPage() {
     const duration = 500;
     if (activeSelectedCard) {
       selectionProgress.value = withTiming(0, { duration, easing: EASING }, (finished) => {
-        if (finished) scheduleOnRN(setActiveSelectedCard, null);
+        if (finished) {
+          activeIndexSV.value = -1;
+          scheduleOnRN(setActiveSelectedCard, null);
+        }
       });
     } else {
+      activeIndexSV.value = selectedCards.findIndex((c) => c.name === card.name);
       selectionProgress.value = withSpring(1, APPLE_SPRING_CONFIG);
       setActiveSelectedCard(card);
     }
-  }, [activeSelectedCard, selectionProgress]);
+  }, [activeSelectedCard, selectionProgress, activeIndexSV, selectedCards]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -214,6 +222,7 @@ export default function CreateNewCardPage() {
               expansionProgress={expansionProgress}
               selectionProgress={selectionProgress}
               activeCardName={activeSelectedCard?.name ?? null}
+              activeIndexSV={activeIndexSV}
               handlePress={handlePress}
               expandDeck={expandDeck}
               onDeleteCard={handleDeleteCard}

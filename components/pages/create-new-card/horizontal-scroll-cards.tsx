@@ -1,10 +1,10 @@
 import { useWindowDimensions } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Card } from './types';
 import { EASING, NAV_HEADER_HEIGHT, PAGE_PX } from './constants';
 import { SwipableCard } from './swipable-card';
+import type { Card } from './types';
 
 export function HorizontalScrollCards({
   cards,

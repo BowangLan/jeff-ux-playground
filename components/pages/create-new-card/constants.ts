@@ -6,7 +6,7 @@ export const DECK_HEIGHT = 120;
 export const THUMB_VISIBLE_HEIGHT = 20;
 export const PEEK_PER_CARD = 28;
 export const PEEK_PER_CARD_EXPANDED = 60;
-export const SELECTED_CARD_TOP = 10;
+export const SELECTED_CARD_TOP = 0;
 export const DECK_VELOCITY_THRESHOLD = 100;
 export const PAGE_PX = 16;
 export const SWIPE_THRESHOLD = 120;
@@ -15,8 +15,8 @@ export const DECK_RADIUS = 30;
 export const NAV_HEADER_HEIGHT = 56;
 
 export const APPLE_SPRING_CONFIG = {
-  damping: 19,
-  stiffness: 160,
+  damping: 15,
+  stiffness: 100,
   mass: 1,
   overshootClamping: false,
 };

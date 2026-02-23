@@ -1,20 +1,34 @@
-import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { Link } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { SharedValue } from 'react-native-reanimated';
 import Animated, {
-  FadeIn,
+  Extrapolation,
   interpolate,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { APPLE_SPRING_CONFIG, EASING, PAGE_PX, PEEK_PER_CARD, PEEK_PER_CARD_EXPANDED, SELECTED_CARD_TOP, THUMB_VISIBLE_HEIGHT } from './constants';
+import { CardGradient } from './card-gradient';
+import {
+  APPLE_SPRING_CONFIG,
+  EASING,
+  EASING_QUAD,
+  PAGE_PX,
+  PEEK_PER_CARD,
+  PEEK_PER_CARD_EXPANDED,
+  SELECTED_CARD_TOP,
+  THUMB_VISIBLE_HEIGHT,
+} from './constants';
 import { Pill } from './pill';
 import type { Card } from './types';
+
+const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 export function DeckCard({
   card,
@@ -22,8 +36,8 @@ export function DeckCard({
   count,
   expansionProgress,
   selectionProgress,
-  isActive,
-  isAfter,
+  activeIndex,
+  activeIndexSV,
   handlePress,
   expandDeck,
   onDelete,
@@ -33,48 +47,63 @@ export function DeckCard({
   count: number;
   expansionProgress: SharedValue<number>;
   selectionProgress: SharedValue<number>;
-  isActive: boolean;
-  isAfter: boolean;
+  activeIndex: number | null;
+  activeIndexSV: SharedValue<number>;
   handlePress: (card: Card) => void;
   expandDeck: () => void;
   onDelete: (card: Card) => void;
 }) {
+  const isActive = activeIndex !== null && activeIndex === index;
   const { height } = useWindowDimensions();
   const peekHeightCollapsed = THUMB_VISIBLE_HEIGHT - index * PEEK_PER_CARD;
   const peekHeightExpanded = THUMB_VISIBLE_HEIGHT - index * PEEK_PER_CARD_EXPANDED;
   const collapsedTop = -peekHeightCollapsed;
   const expandedTop = -peekHeightExpanded;
   const dragOffsetY = useSharedValue(0);
+  const mountProgress = useSharedValue(0);
+
+  useEffect(() => {
+    mountProgress.value = withTiming(1, { duration: 500, easing: EASING_QUAD });
+  }, []);
 
   const animatedStyle = useAnimatedStyle(() => {
     const expandedTranslateY = interpolate(expansionProgress.value, [0, 1], [collapsedTop, expandedTop]);
     const expandedScaleX = interpolate(expansionProgress.value, [0, 1], [0.95, 1]);
 
+    const activeIdx = activeIndexSV.value;
+    const isActiveNow = activeIdx === index;
     let targetTranslateY;
-    if (isActive) {
-      targetTranslateY = SELECTED_CARD_TOP;
-    } else if (isAfter) {
-      targetTranslateY = height - index * PEEK_PER_CARD_EXPANDED;
+    if (activeIdx >= 0) {
+      if (index > activeIdx) {
+        targetTranslateY = height - 120;
+      } else {
+        targetTranslateY = SELECTED_CARD_TOP;
+      }
     } else {
       targetTranslateY = SELECTED_CARD_TOP;
     }
-    const targetOpacity = isActive ? 1 : 0;
+    const targetOpacity = isActiveNow ? 1 : 0.2;
 
-    const translateY = interpolate(selectionProgress.value, [0, 1], [expandedTranslateY, targetTranslateY]) + dragOffsetY.value;
-    const scaleX = interpolate(selectionProgress.value, [0, 1], [expandedScaleX, isActive ? 1 : expandedScaleX]);
-    const opacity = interpolate(selectionProgress.value, [0.5, 1], [1, targetOpacity]);
-    const zIndex = 11 + index;
+    const mountOffset = interpolate(mountProgress.value, [0, 1], [30, 0]);
+    const translateY = interpolate(selectionProgress.value, [0, 1], [expandedTranslateY, targetTranslateY]) + dragOffsetY.value + mountOffset;
+    const scaleX = interpolate(selectionProgress.value, [0, 1], [expandedScaleX, isActiveNow ? 1 : expandedScaleX]);
+    const opacity = interpolate(selectionProgress.value, [0.5, 1], [1, targetOpacity]) * mountProgress.value;
+    const rotateX = interpolate(dragOffsetY.value, [-30, 0, 80], [-0.02, 0, 0.08]);
 
-    return { transform: [{ translateY }, { scaleX }], opacity, zIndex };
+    return {
+      transform: [
+        { perspective: 1200 },
+        { translateY },
+        { scaleX },
+        { rotateX: `${rotateX}rad` as const },
+      ],
+      opacity,
+    };
   });
-
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: isActive || isAfter ? 0 : interpolate(selectionProgress.value, [0, 1], [0, 0.55]),
-  }));
 
   const dragGesture = Gesture.Pan()
     .activeOffsetY([-10, 10])
-    .enabled(isActive)
+    .enabled(false)
     .onUpdate((e) => {
       dragOffsetY.value = e.translationY;
     })
@@ -95,17 +124,24 @@ export function DeckCard({
     }
   });
 
+  const blurAnimatedProps = useAnimatedProps(() => {
+    const activeIdx = activeIndexSV.value;
+    const shouldBlur = activeIdx >= 0 && activeIdx !== index;
+    const intensity = shouldBlur
+      ? interpolate(selectionProgress.value, [0.5, 1], [0, 40], Extrapolation.CLAMP)
+      : 0;
+    return { intensity };
+  });
+
   return (
     <Animated.View
-      entering={FadeIn.duration(300)}
       style={[
         {
           position: 'absolute',
           left: PAGE_PX,
           right: PAGE_PX,
           height: height * 0.7,
-          borderRadius: 14,
-          overflow: 'hidden',
+          zIndex: 11 + index,
         },
         animatedStyle,
       ]}
@@ -113,11 +149,18 @@ export function DeckCard({
       <GestureDetector gesture={Gesture.Race(dragGesture, tapGesture)}>
         <Link href="/create-new-card" asChild>
           <Link.Trigger>
-            <Pressable onPress={() => { }} style={{ flex: 1 }}>
-              <Animated.View style={{ flex: 1 }}>
-                <LinearGradient colors={card.colors} style={{ flex: 1 }} />
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: 16, gap: 16 }}>
-                  <Text style={{ fontSize: 24, fontWeight: '400', color: '#FFFFFF' }}>{card.name}</Text>
+            <Pressable onPress={() => { }} style={{ flex: 1 }} android_ripple={null}>
+              <Animated.View style={{ flex: 1, overflow: 'hidden', borderRadius: 24 }}>
+                <CardGradient colors={card.colors} />
+                <AnimatedBlurView
+                  tint="dark"
+                  animatedProps={blurAnimatedProps}
+                  // intensity={40}
+                  pointerEvents="none"
+                  style={{ position: 'absolute', top: -4, left: -4, right: -4, bottom: -4, zIndex: 15, backgroundColor: '#00000000', borderRadius: 24, borderCurve: 'continuous' }}
+                />
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: 20, gap: 20, zIndex: 10 }}>
+                  <Text style={{ fontSize: 20, fontWeight: '400', color: '#FFFFFF' }}>{card.name}</Text>
                   <View style={{ gap: 12 }}>
                     <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
                       {card.tags.map((tag) => (
@@ -127,10 +170,10 @@ export function DeckCard({
                     <Text style={{ fontSize: 14, lineHeight: 18, color: '#FFFFFFCC' }}>{card.description}</Text>
                   </View>
                 </View>
-                <Animated.View
+                {/* <Animated.View
                   pointerEvents="none"
                   style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000' }, overlayStyle]}
-                />
+                /> */}
               </Animated.View>
             </Pressable>
           </Link.Trigger>

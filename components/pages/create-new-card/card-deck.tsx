@@ -1,8 +1,8 @@
 import { View } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
-import type { Card } from './types';
 import { DECK_HEIGHT, DECK_RADIUS } from './constants';
 import { DeckCard } from './deck-card';
+import type { Card } from './types';
 
 export function CardDeck({
   selectedCards,
@@ -10,6 +10,7 @@ export function CardDeck({
   expansionProgress,
   selectionProgress,
   activeCardName,
+  activeIndexSV,
   handlePress,
   expandDeck,
   onDeleteCard,
@@ -19,6 +20,7 @@ export function CardDeck({
   expansionProgress: SharedValue<number>;
   selectionProgress: SharedValue<number>;
   activeCardName: string | null;
+  activeIndexSV: SharedValue<number>;
   handlePress: (card: Card) => void;
   expandDeck: () => void;
   onDeleteCard: (card: Card) => void;
@@ -36,8 +38,8 @@ export function CardDeck({
           count={count}
           expansionProgress={expansionProgress}
           selectionProgress={selectionProgress}
-          isActive={i === activeIndex}
-          isAfter={activeIndex >= 0 && i > activeIndex}
+          activeIndex={activeIndex >= 0 ? activeIndex : null}
+          activeIndexSV={activeIndexSV}
           handlePress={handlePress}
           expandDeck={expandDeck}
           onDelete={onDeleteCard}

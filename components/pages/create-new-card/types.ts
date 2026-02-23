@@ -3,4 +3,7 @@ export type Card = {
   tags: string[];
   description: string;
   colors: [string, string];
+
+  details: string;
+  effects: string;
 };
