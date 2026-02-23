@@ -15,6 +15,7 @@ import Animated, {
   useAnimatedRef,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +27,12 @@ const DECK_HEIGHT = 120;
 const THUMB_VISIBLE_HEIGHT = 20;
 const PEEK_PER_CARD = 28;
 const DECK_VELOCITY_THRESHOLD = 100;
+const APPLE_SPRING_CONFIG = {
+  damping: 19,
+  stiffness: 160,
+  mass: 1,
+  overshootClamping: false,
+};
 
 export type Card = {
   name: string;
@@ -209,6 +216,7 @@ const DeckCard = ({
   isActive,
   isAfter,
   handlePress,
+  expandDeck,
 }: {
   card: Card;
   index: number;
@@ -218,12 +226,14 @@ const DeckCard = ({
   isActive: boolean;
   isAfter: boolean;
   handlePress: (card: Card) => void;
+  expandDeck: () => void;
 }) => {
   const { height } = useWindowDimensions();
   const peekHeightCollapsed = THUMB_VISIBLE_HEIGHT - index * PEEK_PER_CARD;
   const peekHeightExpanded = THUMB_VISIBLE_HEIGHT - index * PEEK_PER_CARD_EXPANDED;
   const collapsedTop = -peekHeightCollapsed;
   const expandedTop = -peekHeightExpanded;
+  const dragOffsetY = useSharedValue(0);
 
   const animatedStyle = useAnimatedStyle(() => {
     const expandedTranslateY = interpolate(expansionProgress.value, [0, 1], [collapsedTop, expandedTop]);
@@ -236,11 +246,12 @@ const DeckCard = ({
     } else if (isAfter) {
       targetTranslateY = height - index * PEEK_PER_CARD_EXPANDED;
     } else {
-      targetTranslateY = expandedTranslateY;
+      // Cards before the active card slide to the same position as the active card (stack behind it)
+      targetTranslateY = SELECTED_CARD_TOP;
     }
-    const targetOpacity = isActive ? 1 : isAfter ? 0 : 0.4;
+    const targetOpacity = isActive ? 1 : 0;
 
-    const translateY = interpolate(selectionProgress.value, [0, 1], [expandedTranslateY, targetTranslateY]);
+    const translateY = interpolate(selectionProgress.value, [0, 1], [expandedTranslateY, targetTranslateY]) + dragOffsetY.value;
     const scaleX = interpolate(selectionProgress.value, [0, 1], [expandedScaleX, isActive ? 1 : expandedScaleX]);
     const opacity = interpolate(selectionProgress.value, [0.5, 1], [1, targetOpacity]);
     const zIndex = 11 + index;
@@ -251,6 +262,29 @@ const DeckCard = ({
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: isActive || isAfter ? 0 : interpolate(selectionProgress.value, [0, 1], [0, 0.55]),
   }));
+
+  const dragGesture = Gesture.Pan()
+    .activeOffsetY([-10, 10])
+    .enabled(isActive)
+    .onUpdate((e) => {
+      dragOffsetY.value = e.translationY;
+    })
+    .onEnd((e) => {
+      if (e.translationY > 80 || e.velocityY > 500) {
+        dragOffsetY.value = withTiming(0, { duration: 400, easing: EASING });
+        scheduleOnRN(handlePress, card);
+      } else {
+        dragOffsetY.value = withSpring(0, APPLE_SPRING_CONFIG);
+      }
+    });
+
+  const tapGesture = Gesture.Tap().onEnd(() => {
+    if (expansionProgress.value < 0.5) {
+      scheduleOnRN(expandDeck);
+    } else {
+      scheduleOnRN(handlePress, card);
+    }
+  });
 
   return (
     <Animated.View
@@ -267,24 +301,26 @@ const DeckCard = ({
         animatedStyle,
       ]}
     >
-      <Pressable style={{ flex: 1 }} onPress={() => handlePress(card)}>
-        <LinearGradient colors={card.colors} style={{ flex: 1 }} />
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: 16, gap: 16 }}>
-          <Text style={{ fontSize: 24, fontWeight: '400', color: '#FFFFFF' }}>{card.name}</Text>
-          <View style={{ gap: 12 }}>
-            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-              {card.tags.map((tag) => (
-                <Pill key={tag} text={tag} />
-              ))}
+      <GestureDetector gesture={Gesture.Race(dragGesture, tapGesture)}>
+        <Animated.View style={{ flex: 1 }}>
+          <LinearGradient colors={card.colors} style={{ flex: 1 }} />
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: 16, gap: 16 }}>
+            <Text style={{ fontSize: 24, fontWeight: '400', color: '#FFFFFF' }}>{card.name}</Text>
+            <View style={{ gap: 12 }}>
+              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                {card.tags.map((tag) => (
+                  <Pill key={tag} text={tag} />
+                ))}
+              </View>
+              <Text style={{ fontSize: 14, lineHeight: 18, color: '#FFFFFFCC' }}>{card.description}</Text>
             </View>
-            <Text style={{ fontSize: 14, lineHeight: 18, color: '#FFFFFFCC' }}>{card.description}</Text>
           </View>
-        </View>
-      </Pressable>
-      <Animated.View
-        pointerEvents="none"
-        style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000' }, overlayStyle]}
-      />
+          <Animated.View
+            pointerEvents="none"
+            style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000' }, overlayStyle]}
+          />
+        </Animated.View>
+      </GestureDetector>
     </Animated.View>
   );
 };
@@ -296,6 +332,7 @@ const CardDeck = ({
   selectionProgress,
   activeCardName,
   handlePress,
+  expandDeck,
 }: {
   selectedCards: Card[];
   expanded?: boolean;
@@ -303,6 +340,7 @@ const CardDeck = ({
   selectionProgress: SharedValue<number>;
   activeCardName: string | null;
   handlePress: (card: Card) => void;
+  expandDeck: () => void;
 }) => {
   const count = selectedCards.length;
   const activeIndex = activeCardName ? selectedCards.findIndex((c) => c.name === activeCardName) : -1;
@@ -320,6 +358,7 @@ const CardDeck = ({
           isActive={i === activeIndex}
           isAfter={activeIndex >= 0 && i > activeIndex}
           handlePress={handlePress}
+          expandDeck={expandDeck}
         />
       ))}
 
@@ -393,8 +432,9 @@ export default function CreateNewCardPage() {
   const deckTravelDistance = expandedDeckHeight - DECK_HEIGHT;
 
   const expandDeck = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsDeckExpanded(true);
-    expansionProgress.value = withTiming(1, { duration: 400, easing: EASING });
+    expansionProgress.value = withTiming(1, { duration: 600, easing: EASING });
   }, [expansionProgress]);
 
   const gestureStartExpanded = useSharedValue(0);
@@ -406,6 +446,8 @@ export default function CreateNewCardPage() {
         gestureStartExpanded.value = expansionProgress.value > 0.5 ? 1 : 0;
       })
       .onUpdate((e) => {
+        // While a card is selected, don't move the deck
+        if (selectionProgress.value > 0.5) return;
         const wasExpanded = gestureStartExpanded.value > 0.5;
         // 1:1 — deck moves exactly the distance of the user's finger
         if (wasExpanded) {
@@ -417,26 +459,37 @@ export default function CreateNewCardPage() {
         }
       })
       .onEnd((e) => {
+        // Swipe while a card is selected → deselect instead of expand/collapse
+        if (selectionProgress.value > 0.5) {
+          selectionProgress.value = withTiming(0, { duration: 400, easing: EASING }, (finished) => {
+            if (finished) scheduleOnRN(setActiveSelectedCard, null);
+          });
+          return;
+        }
+        const DURATION = 600;
+
         const wasExpanded = gestureStartExpanded.value > 0.5;
         if (wasExpanded) {
           const passedThreshold = e.translationY > DECK_SWIPE_THRESHOLD;
           const passVelocity = e.velocityY > DECK_VELOCITY_THRESHOLD;
           if (passedThreshold || passVelocity) {
-            expansionProgress.value = withTiming(0, { duration: 600, easing: EASING }, (finished) => {
+            scheduleOnRN(Haptics.impactAsync, Haptics.ImpactFeedbackStyle.Light);
+            expansionProgress.value = withTiming(0, { duration: DURATION, easing: EASING }, (finished) => {
               if (finished) scheduleOnRN(setIsDeckExpanded, false);
             });
           } else {
-            expansionProgress.value = withTiming(1, { duration: 600, easing: EASING });
+            expansionProgress.value = withSpring(0, APPLE_SPRING_CONFIG);
           }
         } else {
           const passedThreshold = e.translationY < -DECK_SWIPE_THRESHOLD;
           const passVelocity = e.velocityY < -DECK_VELOCITY_THRESHOLD;
           if (passedThreshold || passVelocity) {
-            expansionProgress.value = withTiming(1, { duration: 600, easing: EASING }, (finished) => {
+            scheduleOnRN(Haptics.impactAsync, Haptics.ImpactFeedbackStyle.Medium);
+            expansionProgress.value = withSpring(1, APPLE_SPRING_CONFIG, (finished) => {
               if (finished) scheduleOnRN(setIsDeckExpanded, true);
             });
           } else {
-            expansionProgress.value = withTiming(0, { duration: 600, easing: EASING });
+            expansionProgress.value = withTiming(0, { duration: DURATION, easing: EASING });
           }
         }
       });
@@ -448,7 +501,7 @@ export default function CreateNewCardPage() {
     });
 
     return Gesture.Race(pan, tap);
-  }, [expansionProgress, gestureStartExpanded, expandDeck, deckTravelDistance]);
+  }, [expansionProgress, gestureStartExpanded, expandDeck, deckTravelDistance, selectionProgress]);
 
   const scrollCardsAnimatedStyle = useAnimatedStyle(() => ({
     opacity: 1 - expansionProgress.value,
@@ -468,14 +521,15 @@ export default function CreateNewCardPage() {
   }, []);
 
   const handlePress = useCallback((card: Card) => {
-    if (expansionProgress.value < 0.5) return;
-    const duration = 500;
+    const duration = 600;
     if (activeSelectedCard) {
       selectionProgress.value = withTiming(0, { duration, easing: EASING }, (finished) => {
         if (finished) scheduleOnRN(setActiveSelectedCard, null);
       });
     } else {
-      selectionProgress.value = withTiming(1, { duration, easing: EASING });
+      // selectionProgress.value = withTiming(1, { duration, easing: EASING });
+      // Apple-like: Use a highly damped, natural spring for a smooth, gentle pop with slight bounce
+      selectionProgress.value = withSpring(1, APPLE_SPRING_CONFIG);
       setActiveSelectedCard(card);
     }
   }, [activeSelectedCard, selectionProgress]);
@@ -546,6 +600,7 @@ export default function CreateNewCardPage() {
               selectionProgress={selectionProgress}
               activeCardName={activeSelectedCard?.name ?? null}
               handlePress={handlePress}
+              expandDeck={expandDeck}
             />
           </View>
         </Animated.View>
