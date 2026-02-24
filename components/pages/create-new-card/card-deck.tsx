@@ -4,7 +4,7 @@ import { DECK_HEIGHT, DECK_RADIUS } from './constants';
 import { DeckCard } from './deck-card';
 import type { Card } from './types';
 
-export function CardDeck({
+export function BottomCardDeck({
   selectedCards,
   expanded,
   expansionProgress,
@@ -14,6 +14,7 @@ export function CardDeck({
   handlePress,
   expandDeck,
   onDeleteCard,
+  scrollOffsetSV,
 }: {
   selectedCards: Card[];
   expanded?: boolean;
@@ -24,6 +25,7 @@ export function CardDeck({
   handlePress: (card: Card) => void;
   expandDeck: () => void;
   onDeleteCard: (card: Card) => void;
+  scrollOffsetSV: SharedValue<number>;
 }) {
   const count = selectedCards.length;
   const activeIndex = activeCardName ? selectedCards.findIndex((c) => c.name === activeCardName) : -1;
@@ -43,6 +45,7 @@ export function CardDeck({
           handlePress={handlePress}
           expandDeck={expandDeck}
           onDelete={onDeleteCard}
+          scrollOffsetSV={scrollOffsetSV}
         />
       ))}
 
