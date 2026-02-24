@@ -36,11 +36,15 @@ export default function CreateNewCardPage() {
   const [selectedCards, setSelectedCards] = useState<Card[]>([]);
   const isDraggingSV = useSharedValue(0);
   const [isDeckExpanded, setIsDeckExpanded] = useState(false);
+
+  // holds the progress of the deck expansion
   const expansionProgress = useSharedValue(0);
 
   const [activeSelectedCard, setActiveSelectedCard] = useState<Card | null>(null);
   const selectionProgress = useSharedValue(0);
   const activeIndexSV = useSharedValue(-1);
+  // SV stands for "Shared Value" in Reanimated, so this holds the shared value for the page Y offset.
+  const pageYOffsetSV = useSharedValue(0);
 
   const deckTopY = height - DECK_HEIGHT;
   const navHeaderHeight = insets.top + NAV_HEADER_HEIGHT;
@@ -119,11 +123,13 @@ export default function CreateNewCardPage() {
     return Gesture.Race(pan, tap);
   }, [expansionProgress, gestureStartExpanded, expandDeck, deckTravelDistance, selectionProgress, activeIndexSV]);
 
-  const scrollCardsAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: 1 - expansionProgress.value,
-    transform: [{ translateY: interpolate(expansionProgress.value, [0, 1], [0, -80]) }],
-    zIndex: isDraggingSV.value > 0 ? 100 : 1,
-  }));
+  const scrollCardsAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: 1 - expansionProgress.value,
+      transform: [{ translateY: interpolate(expansionProgress.value, [0, 1], [0, -80]) }],
+      zIndex: isDraggingSV.value > 0 ? 100 : 1,
+    }
+  });
 
   const deckContainerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: interpolate(expansionProgress.value, [0, 1], [deckTravelDistance, 0]) }],
@@ -142,7 +148,7 @@ export default function CreateNewCardPage() {
   }, []);
 
   const handlePress = useCallback((card: Card) => {
-    const duration = 500;
+    const duration = 600;
     if (activeSelectedCard) {
       selectionProgress.value = withTiming(0, { duration, easing: EASING }, (finished) => {
         if (finished) {
@@ -179,56 +185,58 @@ export default function CreateNewCardPage() {
         </Pressable>
       </View>
 
-      <Animated.View
-        style={[
-          {
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            pointerEvents: isDeckExpanded ? 'none' : 'auto',
-          },
-          scrollCardsAnimatedStyle,
-        ]}
-      >
-        <HorizontalScrollCards
-          cards={cards}
-          onRemoveCard={handleRemoveCard}
-          deckTopY={deckTopY}
-          isDraggingSV={isDraggingSV}
-        />
-      </Animated.View>
-
       <GestureDetector gesture={deckGesture}>
-        <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              top: navHeaderHeight,
-              height: expandedDeckHeight,
-              overflow: 'visible',
-              paddingTop: 12,
-              borderTopLeftRadius: DECK_RADIUS,
-              borderTopRightRadius: DECK_RADIUS,
-            },
-            deckContainerAnimatedStyle,
-          ]}
-        >
-          <View style={{ flex: 1 }}>
-            <CardDeck
-              selectedCards={selectedCards}
-              expanded={isDeckExpanded}
-              expansionProgress={expansionProgress}
-              selectionProgress={selectionProgress}
-              activeCardName={activeSelectedCard?.name ?? null}
-              activeIndexSV={activeIndexSV}
-              handlePress={handlePress}
-              expandDeck={expandDeck}
-              onDeleteCard={handleDeleteCard}
+        <View style={{ flex: 1 }}>
+          <Animated.View
+            style={[
+              {
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                pointerEvents: isDeckExpanded ? 'none' : 'auto',
+              },
+              scrollCardsAnimatedStyle,
+            ]}
+          >
+            <HorizontalScrollCards
+              cards={cards}
+              onRemoveCard={handleRemoveCard}
+              deckTopY={deckTopY}
+              isDraggingSV={isDraggingSV}
             />
-          </View>
-        </Animated.View>
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: navHeaderHeight,
+                height: expandedDeckHeight,
+                overflow: 'visible',
+                paddingTop: 12,
+                borderTopLeftRadius: DECK_RADIUS,
+                borderTopRightRadius: DECK_RADIUS,
+              },
+              deckContainerAnimatedStyle,
+            ]}
+          >
+            <View style={{ flex: 1 }}>
+              <CardDeck
+                selectedCards={selectedCards}
+                expanded={isDeckExpanded}
+                expansionProgress={expansionProgress}
+                selectionProgress={selectionProgress}
+                activeCardName={activeSelectedCard?.name ?? null}
+                activeIndexSV={activeIndexSV}
+                handlePress={handlePress}
+                expandDeck={expandDeck}
+                onDeleteCard={handleDeleteCard}
+              />
+            </View>
+          </Animated.View>
+        </View>
       </GestureDetector>
     </View>
   );

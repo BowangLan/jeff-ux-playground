@@ -35,14 +35,16 @@ export function SwipableCard({
   const cardRef = useAnimatedRef<Animated.View>();
 
   const panGesture = Gesture.Pan()
-    .activeOffsetY([-10, 10])
+    .activeOffsetY(10)
+    .failOffsetY(-10)
     .failOffsetX([-15, 15])
     .onStart(() => {
       isDraggingSV.value = 1;
     })
     .onUpdate((e) => {
-      translateY.value = clamp(e.translationY, 0, deckTopY);
-      rotateX.value = interpolate(e.translationY, [30, 0, -30], [0.02, 0, -0.10]);
+      const currentY = clamp(e.translationY, 0, deckTopY);
+      translateY.value = currentY;
+      rotateX.value = interpolate(currentY, [30, 0, -30], [0.02, 0, -0.10]);
     })
     .onEnd((e) => {
       const velocityThreshold = 500;

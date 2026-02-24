@@ -1,7 +1,6 @@
 import { BlurView } from 'expo-blur';
-import { Link } from 'expo-router';
 import { useEffect } from 'react';
-import { Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import type { SharedValue } from 'react-native-reanimated';
 import Animated, {
@@ -133,6 +132,34 @@ export function DeckCard({
     return { intensity };
   });
 
+  const cardContent = (
+    <Animated.View style={{ flex: 1, overflow: 'hidden', borderRadius: 24 }}>
+      <CardGradient colors={card.colors} />
+      <AnimatedBlurView
+        tint="dark"
+        animatedProps={blurAnimatedProps}
+        // intensity={40}
+        pointerEvents="none"
+        style={{ position: 'absolute', top: -4, left: -4, right: -4, bottom: -4, zIndex: 15, backgroundColor: '#00000000', borderRadius: 24, borderCurve: 'continuous' }}
+      />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: 20, gap: 20, zIndex: 10 }}>
+        <Text style={{ fontSize: 20, fontWeight: '400', color: '#FFFFFF' }}>{card.name}</Text>
+        <View style={{ gap: 12 }}>
+          <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+            {card.tags.map((tag) => (
+              <Pill key={tag} text={tag} />
+            ))}
+          </View>
+          <Text style={{ fontSize: 14, lineHeight: 18, color: '#FFFFFFCC' }}>{card.description}</Text>
+        </View>
+      </View>
+      {/* <Animated.View
+                  pointerEvents="none"
+                  style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000' }, overlayStyle]}
+                /> */}
+    </Animated.View>
+  )
+
   return (
     <Animated.View
       style={[
@@ -147,34 +174,9 @@ export function DeckCard({
       ]}
     >
       <GestureDetector gesture={Gesture.Race(dragGesture, tapGesture)}>
-        <Link href="/create-new-card" asChild>
+        {/* <Link href="/create-new-card" asChild>
           <Link.Trigger>
             <Pressable onPress={() => { }} style={{ flex: 1 }} android_ripple={null}>
-              <Animated.View style={{ flex: 1, overflow: 'hidden', borderRadius: 24 }}>
-                <CardGradient colors={card.colors} />
-                <AnimatedBlurView
-                  tint="dark"
-                  animatedProps={blurAnimatedProps}
-                  // intensity={40}
-                  pointerEvents="none"
-                  style={{ position: 'absolute', top: -4, left: -4, right: -4, bottom: -4, zIndex: 15, backgroundColor: '#00000000', borderRadius: 24, borderCurve: 'continuous' }}
-                />
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: 20, gap: 20, zIndex: 10 }}>
-                  <Text style={{ fontSize: 20, fontWeight: '400', color: '#FFFFFF' }}>{card.name}</Text>
-                  <View style={{ gap: 12 }}>
-                    <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                      {card.tags.map((tag) => (
-                        <Pill key={tag} text={tag} />
-                      ))}
-                    </View>
-                    <Text style={{ fontSize: 14, lineHeight: 18, color: '#FFFFFFCC' }}>{card.description}</Text>
-                  </View>
-                </View>
-                {/* <Animated.View
-                  pointerEvents="none"
-                  style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000' }, overlayStyle]}
-                /> */}
-              </Animated.View>
             </Pressable>
           </Link.Trigger>
           <Link.Menu>
@@ -185,7 +187,8 @@ export function DeckCard({
               onPress={() => scheduleOnRN(onDelete, card)}
             />
           </Link.Menu>
-        </Link>
+        </Link> */}
+        {cardContent}
       </GestureDetector>
     </Animated.View>
   );
